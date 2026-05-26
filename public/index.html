@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruta 2 | Juárez-Leones</title>
+
+    <!-- Enlace principal de CSS -->
+    <link rel="stylesheet" href="https://unpkg.com" />
+
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
+        /* Forzamos que el contenedor tenga tamaño real */
+        #map {
+            width: 100vw;
+            height: 70vh;
+            background: #cbd5e0;
+            display: block;
+        }
+        .ui { padding: 20px; text-align: center; font-family: sans-serif; }
+        button { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-camion { background: #3182ce; color: white; }
+        .btn-off { background: #e53e3e; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="ui">
+        <h2>Ruta 2 Juárez-Leones</h2>
+        <button id="btnAction" class="btn-camion" onclick="controlRastreo()">Activar Modo Camión</button>
+        <p id="msg" style="color: red; font-weight: bold;">Cargando mapa...</p>
+    </div>
+
+    <!-- Scripts de respaldo -->
+    <script src="https://unpkg.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        let map, watchId = null, marcadorCamion = null;
+        const socket = typeof io !== 'undefined' ? io() : null;
+
+        function iniciarMapa() {
+            // Verificamos si Leaflet (L) realmente cargó
+            if (typeof L === 'undefined') {
+                document.getElementById('msg').innerText = "ERROR: No se pudo conectar con el servidor de mapas. Revisa tu internet.";
+                return;
+            }
+
+            document.getElementById('msg').innerText = "Mapa cargado correctamente.";
+            document.getElementById('msg').style.color = "green";
+
+            // Crear mapa
+            map = L.map('map').setView([25.6866, -100.3161], 12);
+
+            // Capa de diseño (OpenStreetMap)
+            L.tileLayer('https://openstreetmap.org{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+
+            // Dibujar Ruta Oficial
+            const rutaCoordenadas = [
+                [25.6475, -100.0965], [25.6750, -100.2500],
+                [25.6714, -100.3086], [25.7250, -100.4000]
+            ];
+            L.polyline(rutaCoordenadas, {color: 'blue', weight: 7}).addTo(map);
+        }
+
+        function controlRastreo() {
+            const btn = document.getElementById('btnAction');
+
+            if (watchId === null) {
+                // ACTIVAR GPS
+                if (navigator.geolocation) {
+                    watchId = navigator.geolocation.watchPosition(pos => {
+                        const { latitude, longitude } = pos.coords;
+                        if (socket) socket.emit('actualizar-ubicacion', { id: 'R2-U1', lat: latitude, lng: longitude });
+
+                        // Mover nuestro propio marcador
+                        if (!marcadorCamion) {
+                            marcadorCamion = L.marker([latitude, longitude]).addTo(map).bindPopup("Mi Unidad").openPopup();
+                        } else {
+                            marcadorCamion.setLatLng([latitude, longitude]);
+                        }
+                        map.panTo([latitude, longitude]);
+                    }, null, { enableHighAccuracy: true });
+
+                    btn.innerText = "Desactivar Ruta del Camión";
+                    btn.className = "btn-off";
+                }
+            } else {
+                // DESACTIVAR (La línea de código solicitada)
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                if (socket) socket.emit('actualizar-ubicacion', { id: 'R2-U1', lat: null, lng: null });
+                if (marcadorCamion) map.removeLayer(marcadorCamion);
+                marcadorCamion = null;
+
+                btn.innerText = "Activar Modo Camión";
+                btn.className = "btn-camion";
+            }
+        }
+
+        // Ejecutar al cargar la página
+        window.onload = iniciarMapa;
+    </script>
+</body>
+</html>
+
